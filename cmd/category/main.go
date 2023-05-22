@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gocolly/colly/v2"
 	"github.com/matinkhosravani/fidibo_crawler/app"
-	"github.com/matinkhosravani/fidibo_crawler/storage"
 	"github.com/matinkhosravani/fidibo_crawler/utils"
 	"net/http"
 	"regexp"
@@ -24,7 +23,7 @@ func main() {
 		colly.MaxDepth(50),
 		colly.Async(true),
 	)
-	s := storage.SetupCollyStorage(c)
+	s := utils.SetupCollyStorage(c)
 	// close redis client
 	defer s.Client.Close()
 
@@ -39,7 +38,7 @@ func main() {
 		link = strings.Replace(link, "?&", "?", 1)
 		// Visit link found on page
 		// Only those links are visited which are matched by  any of the URLFilter regexps
-		if strings.Contains(link, "/book/") {
+		if strings.Contains(link, "/model/") {
 			url := e.Request.AbsoluteURL(link)
 			bookID, err := utils.ExtractBoodIDFromURL(url)
 			if err != nil {

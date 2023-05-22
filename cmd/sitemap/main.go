@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/gocolly/colly/v2"
 	"github.com/matinkhosravani/fidibo_crawler/app"
-	storage "github.com/matinkhosravani/fidibo_crawler/storage"
 	"github.com/matinkhosravani/fidibo_crawler/utils"
 	"log"
 	"net/http"
@@ -20,7 +19,7 @@ func main() {
 		colly.AllowedDomains("fidibo.com"),
 	)
 	book := c.Clone()
-	s := storage.SetupCollyStorage(book)
+	s := utils.SetupCollyStorage(book)
 	// close redis client
 	defer s.Client.Close()
 

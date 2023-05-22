@@ -1,15 +1,15 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/gocolly/colly/v2"
 	"github.com/matinkhosravani/fidibo_crawler/app"
-	"github.com/matinkhosravani/fidibo_crawler/storage"
-	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/mongo"
+	"github.com/matinkhosravani/fidibo_crawler/cache/redis"
+	"github.com/matinkhosravani/fidibo_crawler/crawler"
+	"github.com/matinkhosravani/fidibo_crawler/model"
+	"github.com/matinkhosravani/fidibo_crawler/repository/mongo"
 	"io"
 	"log"
 	"net/http"
@@ -22,25 +22,35 @@ var (
 	concurrency = 7
 	semaChan    = make(chan struct{}, concurrency)
 )
+var c = crawler.NewCrawler()
 
 func main() {
 	app.LoadEnv()
-	storage.ConnectToMongo()
+	c.Repo = chooseRepo()
+	c.Cache = chooseCache()
+
 	log.Println("Connected to MongoDB!")
 	categories := findCategories()
 	log.Println("Founded all Root categories")
 
-	collection := storage.Client.Database(os.Getenv("MONGO_DATABASE")).Collection("books")
 	done := make(chan struct{})
 
 	for _, category := range categories {
 		responses := make(chan CategoryResponse)
 		totalPages, _ := findTotalPages(category)
-		go persistBooks(responses, collection, totalPages)
+		go func() {
+			for i := 0; i < totalPages; i++ {
+				resp := <-responses
+				err := c.Repo.Store(resp.Books)
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+			}
+		}()
 
 		for i := 1; i <= totalPages; i++ {
-			page := storage.Redis().Get(context.Background(), fmt.Sprintf("%s_%d", category, i))
-			if page.Err() == redis.Nil {
+			isPageCached := c.Cache.BooksOfCategoryPageExists(category.Name, i)
+			if !isPageCached {
 				semaChan <- struct{}{} // block while full
 				go getBooksByCategory(category, i, responses)
 			}
@@ -54,38 +64,15 @@ func main() {
 	<-done
 }
 
-func persistBooks(responses <-chan CategoryResponse, collection *mongo.Collection, totalPages int) {
-	for i := 0; i < totalPages; i++ {
-		resp := <-responses
-		for _, book := range resp.Books {
-			_, err := collection.InsertOne(context.Background(), book)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+func findCategories() []model.Category {
+	categories := c.Cache.GetCategories()
+	if categories != nil {
+		return categories
 	}
+	return getAllRootCategories()
 }
 
-func findCategories() []string {
-	cachedCategories := storage.Redis().Get(context.Background(), "fidibo_categories")
-	var categories []string
-	if cachedCategories.Err() != redis.Nil {
-		json.Unmarshal([]byte(cachedCategories.Val()), &categories)
-	} else {
-		categories = getAllRootCategories()
-		j, err := json.Marshal(categories)
-		if err != nil {
-			fmt.Println(err)
-		}
-		s := storage.Redis().Set(context.Background(), "fidibo_categories", string(j), time.Hour*1)
-		if s.Err() != redis.Nil {
-			fmt.Println(s.Err().Error())
-		}
-	}
-	return categories
-}
-
-func findTotalPages(category string) (int, error) {
+func findTotalPages(category model.Category) (int, error) {
 	resChannel := make(chan CategoryResponse)
 	go getBooksByCategory(category, 1, resChannel)
 	resp := <-resChannel
@@ -93,43 +80,8 @@ func findTotalPages(category string) (int, error) {
 	return resp.TotalPages, nil
 }
 
-type Book struct {
-	ID            string   `json:"id"`
-	Title         string   `json:"title"`
-	SubTitle      string   `json:"sub_title"`
-	Slug          string   `json:"slug"`
-	PublishDate   string   `json:"publish_date"`
-	Language      string   `json:"language"`
-	Free          string   `json:"free"`
-	Price         string   `json:"price"`
-	Description   string   `json:"description"`
-	PublisherID   string   `json:"publisher_id"`
-	TranslatorID  string   `json:"translator_id"`
-	NarratorID    any      `json:"narrator_id"`
-	Format        string   `json:"format"`
-	Subscriptions bool     `json:"subscriptions"`
-	URL           string   `json:"url"`
-	ImageURL      string   `json:"image_url"`
-	AudioFormat   bool     `json:"audio_format"`
-	Authors       []Author `json:"authors"`
-}
-
-type Author struct {
-	ID   string
-	Name string
-}
-
-type Narrotor struct {
-	ID   string
-	Name string
-}
-
-type Publisher struct {
-	ID string
-}
-
 type CategoryResponse struct {
-	Books       []Book        `json:"books"`
+	Books       []model.Book  `json:"books"`
 	Page        int           `json:"page"`
 	PerPage     int           `json:"size"`
 	Sorting     string        `json:"sorting"`
@@ -141,11 +93,11 @@ type CategoryResponse struct {
 
 type option func(url *string)
 
-func getBooksByCategory(category string, page int, responseStream chan<- CategoryResponse, options ...option) {
+func getBooksByCategory(category model.Category, page int, responseStream chan<- CategoryResponse, options ...option) {
 	defer func() {
 		<-semaChan // read releases a slot
 	}()
-	url := fmt.Sprintf("https://fidibo.com/category/%v?page=%v", category, page)
+	url := fmt.Sprintf("https://fidibo.com/category/%v?page=%v", category.Name, page)
 	for _, opt := range options {
 		opt(&url)
 	}
@@ -166,11 +118,10 @@ func getBooksByCategory(category string, page int, responseStream chan<- Categor
 		log.Fatal(err.Error())
 	}
 	responseStream <- categoryResp
-	j, err := json.Marshal(categoryResp.Books)
+	err = c.Cache.SetBooksOfCategoryPage(category.Name, page, categoryResp.Books, time.Hour*24)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err.Error())
 	}
-	storage.Redis().Set(context.Background(), fmt.Sprintf("%s_%d", category, page), string(j), time.Hour*24)
 }
 
 func setHeaders(req *http.Request, url string) {
@@ -192,8 +143,8 @@ func withParams(key, value string) option {
 	}
 }
 
-func getAllRootCategories() []string {
-	var categories []string
+func getAllRootCategories() []model.Category {
+	var categories []model.Category
 
 	c := colly.NewCollector(
 		colly.AllowedDomains("fidibo.com"),
@@ -205,7 +156,9 @@ func getAllRootCategories() []string {
 	c.OnHTML("ul.dropdown-menu > div > li > a", func(e *colly.HTMLElement) {
 		category := strings.Replace(e.Attr("href"), "/category/", "", 1)
 		if category != "" {
-			categories = append(categories, category)
+			categories = append(categories, model.Category{
+				Name: category,
+			})
 		}
 	})
 
@@ -215,4 +168,29 @@ func getAllRootCategories() []string {
 	}
 
 	return categories
+}
+
+func chooseCache() crawler.CrawlerCache {
+	switch os.Getenv("CACHE_NAME") {
+	case "redis":
+		cache, err := redis.NewRedisCacheRepository()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		return cache
+	}
+	return nil
+}
+
+func chooseRepo() crawler.CrawlerRepository {
+	switch os.Getenv("DB_NAME") {
+	case "mongo":
+		repo, err := mongo.NewMongoRepository()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		return repo
+	}
+
+	return nil
 }
