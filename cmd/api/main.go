@@ -10,6 +10,7 @@ import (
 	"github.com/matinkhosravani/fidibo_crawler/crawler"
 	"github.com/matinkhosravani/fidibo_crawler/model"
 	"github.com/matinkhosravani/fidibo_crawler/repository/mongo"
+	"github.com/matinkhosravani/fidibo_crawler/repository/mysql"
 	"io"
 	"log"
 	"net/http"
@@ -173,7 +174,7 @@ func getAllRootCategories() []model.Category {
 func chooseCache() crawler.CrawlerCache {
 	switch os.Getenv("CACHE_NAME") {
 	case "redis":
-		cache, err := redis.NewRedisCacheRepository()
+		cache, err := redis.NewCacheRepository()
 		if err != nil {
 			log.Fatal(err.Error())
 		}
@@ -185,7 +186,13 @@ func chooseCache() crawler.CrawlerCache {
 func chooseRepo() crawler.CrawlerRepository {
 	switch os.Getenv("DB_NAME") {
 	case "mongo":
-		repo, err := mongo.NewMongoRepository()
+		repo, err := mongo.NewRepository()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		return repo
+	case "mysql":
+		repo, err := mysql.NewRepository()
 		if err != nil {
 			log.Fatal(err.Error())
 		}

@@ -1,7 +1,10 @@
-package model
+package mysql
+
+import "gorm.io/gorm"
 
 type Book struct {
-	ID            string   `json:"id"`
+	gorm.Model
+	BookID        string   `json:"id"`
 	Title         string   `json:"title"`
 	SubTitle      string   `json:"sub_title"`
 	Slug          string   `json:"slug"`
@@ -18,19 +21,11 @@ type Book struct {
 	URL           string   `json:"url"`
 	ImageURL      string   `json:"image_url"`
 	AudioFormat   bool     `json:"audio_format"`
-	Authors       []Author `json:"authors"`
+	Authors       []Author `json:"authors" gorm:"many2many:user_authors;"`
 }
 
 type Author struct {
-	ID   string
-	Name string
-}
-
-type Narrotor struct {
-	ID   string
-	Name string
-}
-
-type Publisher struct {
-	ID string
+	gorm.Model
+	AuthorID string `json:"id"`
+	Name     string
 }

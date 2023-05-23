@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-type redisCacheRepository struct {
+type cacheRepository struct {
 	client *redis.Client
 }
 
-func (r redisCacheRepository) SetCategories(cs []model.Category, expiration time.Duration) error {
+func (r cacheRepository) SetCategories(cs []model.Category, expiration time.Duration) error {
 	j, err := json.Marshal(cs)
 	if err != nil {
 		fmt.Println(err)
@@ -33,7 +33,7 @@ func generateCategoriesKey() string {
 	return "fidibo_categories"
 }
 
-func (r redisCacheRepository) GetCategories() []model.Category {
+func (r cacheRepository) GetCategories() []model.Category {
 	cache := r.client.Get(context.Background(), generateCategoriesKey())
 	var categories []model.Category
 	if cache.Err() != redis.Nil {
@@ -43,7 +43,7 @@ func (r redisCacheRepository) GetCategories() []model.Category {
 	return categories
 }
 
-func (r redisCacheRepository) SetBooksOfCategoryPage(category string, page int, bs []model.Book, expiration time.Duration) error {
+func (r cacheRepository) SetBooksOfCategoryPage(category string, page int, bs []model.Book, expiration time.Duration) error {
 	j, err := json.Marshal(bs)
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func generateCategoryPageKey(category string, page int) string {
 	return fmt.Sprintf("%s_%d", category, page)
 }
 
-func (r redisCacheRepository) BooksOfCategoryPageExists(category string, page int) bool {
+func (r cacheRepository) BooksOfCategoryPageExists(category string, page int) bool {
 	res := r.client.Get(context.Background(), fmt.Sprintf("%s_%v", category, page))
 	if res.Err() == redis.Nil {
 		return false
@@ -67,8 +67,8 @@ func (r redisCacheRepository) BooksOfCategoryPageExists(category string, page in
 
 }
 
-func NewRedisCacheRepository() (crawler.CrawlerCache, error) {
-	repo := &redisCacheRepository{}
+func NewCacheRepository() (crawler.CrawlerCache, error) {
+	repo := &cacheRepository{}
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%v:%v", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT")),

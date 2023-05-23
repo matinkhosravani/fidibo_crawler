@@ -10,14 +10,14 @@ import (
 	"os"
 )
 
-type MongoRepository struct {
+type Repository struct {
 	Client   *mongo.Client
 	DB       string
 	MongoURL string
 	Timeout  int
 }
 
-func (m MongoRepository) Store(bs []model.Book) error {
+func (m Repository) Store(bs []model.Book) error {
 	collection := m.Client.Database(m.DB).Collection("books")
 	is := make([]interface{}, len(bs))
 	for i := range bs {
@@ -33,9 +33,9 @@ func (m MongoRepository) Store(bs []model.Book) error {
 
 var Client *mongo.Client
 
-func NewMongoRepository() (crawler.CrawlerRepository, error) {
+func NewRepository() (crawler.CrawlerRepository, error) {
 
-	repo := &MongoRepository{
+	repo := &Repository{
 		Client:   nil,
 		DB:       os.Getenv("MONGO_DATABASE"),
 		MongoURL: fmt.Sprintf("mongodb://%v:%v", os.Getenv("MONGO_HOST"), os.Getenv("MONGO_PORT")),
