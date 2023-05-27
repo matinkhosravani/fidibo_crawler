@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/matinkhosravani/fidibo_crawler/crawler"
-	"github.com/matinkhosravani/fidibo_crawler/model"
+	domain2 "github.com/matinkhosravani/fidibo_crawler/core/domain"
+	"github.com/matinkhosravani/fidibo_crawler/core/ports"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"os"
@@ -16,7 +16,7 @@ type cacheRepository struct {
 	client *redis.Client
 }
 
-func (r cacheRepository) SetCategories(cs []model.Category, expiration time.Duration) error {
+func (r cacheRepository) SetCategories(cs []domain2.Category, expiration time.Duration) error {
 	j, err := json.Marshal(cs)
 	if err != nil {
 		fmt.Println(err)
@@ -33,9 +33,9 @@ func generateCategoriesKey() string {
 	return "fidibo_categories"
 }
 
-func (r cacheRepository) GetCategories() []model.Category {
+func (r cacheRepository) GetCategories() []domain2.Category {
 	cache := r.client.Get(context.Background(), generateCategoriesKey())
-	var categories []model.Category
+	var categories []domain2.Category
 	if cache.Err() != redis.Nil {
 		json.Unmarshal([]byte(cache.Val()), &categories)
 	}
@@ -43,7 +43,7 @@ func (r cacheRepository) GetCategories() []model.Category {
 	return categories
 }
 
-func (r cacheRepository) SetBooksOfCategoryPage(category string, page int, bs []model.Book, expiration time.Duration) error {
+func (r cacheRepository) SetBooksOfCategoryPage(category string, page int, bs []domain2.Book, expiration time.Duration) error {
 	j, err := json.Marshal(bs)
 	if err != nil {
 		return err
@@ -67,7 +67,7 @@ func (r cacheRepository) BooksOfCategoryPageExists(category string, page int) bo
 
 }
 
-func NewCacheRepository() (crawler.CrawlerCache, error) {
+func NewCacheRepository() (ports.CrawlerCache, error) {
 	repo := &cacheRepository{}
 
 	client := redis.NewClient(&redis.Options{

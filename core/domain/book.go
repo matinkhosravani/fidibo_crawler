@@ -1,4 +1,4 @@
-package model
+package domain
 
 type Book struct {
 	ID            string   `json:"id"`
@@ -19,18 +19,4 @@ type Book struct {
 	ImageURL      string   `json:"image_url"`
 	AudioFormat   bool     `json:"audio_format"`
 	Authors       []Author `json:"authors"`
-}
-
-type Author struct {
-	ID   string
-	Name string
-}
-
-type Narrotor struct {
-	ID   string
-	Name string
-}
-
-type Publisher struct {
-	ID string
 }

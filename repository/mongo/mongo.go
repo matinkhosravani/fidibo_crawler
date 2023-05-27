@@ -3,8 +3,8 @@ package mongo
 import (
 	"context"
 	"fmt"
-	"github.com/matinkhosravani/fidibo_crawler/crawler"
-	"github.com/matinkhosravani/fidibo_crawler/model"
+	"github.com/matinkhosravani/fidibo_crawler/core/domain"
+	"github.com/matinkhosravani/fidibo_crawler/core/ports"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"os"
@@ -17,7 +17,7 @@ type Repository struct {
 	Timeout  int
 }
 
-func (m Repository) Store(bs []model.Book) error {
+func (m Repository) Store(bs []domain.Book) error {
 	collection := m.Client.Database(m.DB).Collection("books")
 	is := make([]interface{}, len(bs))
 	for i := range bs {
@@ -33,7 +33,7 @@ func (m Repository) Store(bs []model.Book) error {
 
 var Client *mongo.Client
 
-func NewRepository() (crawler.CrawlerRepository, error) {
+func NewRepository() (ports.CrawlerRepository, error) {
 
 	repo := &Repository{
 		Client:   nil,

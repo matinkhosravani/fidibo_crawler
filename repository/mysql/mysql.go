@@ -2,8 +2,8 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/matinkhosravani/fidibo_crawler/crawler"
-	"github.com/matinkhosravani/fidibo_crawler/model"
+	"github.com/matinkhosravani/fidibo_crawler/core/domain"
+	"github.com/matinkhosravani/fidibo_crawler/core/ports"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"os"
@@ -13,8 +13,8 @@ type Repository struct {
 	DB *gorm.DB
 }
 
-func (m Repository) Store(bs []model.Book) error {
-	gormBooks := adaptModels(bs)
+func (m Repository) Store(bs []domain.Book) error {
+	gormBooks := fromDomain(bs)
 
 	for _, gb := range gormBooks {
 		m.DB.Create(&gb)
@@ -23,7 +23,7 @@ func (m Repository) Store(bs []model.Book) error {
 	return nil
 }
 
-func adaptModels(bs []model.Book) []Book {
+func fromDomain(bs []domain.Book) []Book {
 	var gbs []Book
 	for _, b := range bs {
 		gb := Book{
@@ -61,7 +61,7 @@ func adaptModels(bs []model.Book) []Book {
 	return gbs
 }
 
-func NewRepository() (crawler.CrawlerRepository, error) {
+func NewRepository() (ports.CrawlerRepository, error) {
 	repo := &Repository{}
 
 	dsn := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=Local",
