@@ -19,6 +19,9 @@ func main() {
 		colly.AllowedDomains("fidibo.com"),
 	)
 	book := c.Clone()
+	author := c.Clone()
+	publisher := c.Clone()
+
 	s := utils.SetupCollyStorage(book)
 	// close redis client
 	defer s.Client.Close()
@@ -33,9 +36,43 @@ func main() {
 		if strings.Contains(link, "sitemap_book") {
 			book.Visit(link)
 		}
+		if strings.Contains(link, "sitemap_author") {
+			author.Visit(link)
+		}
+		if strings.Contains(link, "sitemap_publisher") {
+			publisher.Visit(link)
+		}
 	})
 
 	book.OnXML("//urlset/url/loc", func(e *colly.XMLElement) {
+		bookID, err := utils.ExtractBoodIDFromURL(e.Text)
+		if err != nil {
+			log.Println(err)
+		} else {
+			wg.Add(1)
+			go func(bookID string) {
+				defer wg.Done()
+				s.Client.HSet("fidibo_books", bookID, e.Text)
+				s.Client.SAdd("fidibo_book_ids", bookID)
+			}(bookID)
+		}
+	})
+
+	author.OnXML("//urlset/url/loc", func(e *colly.XMLElement) {
+		bookID, err := utils.ExtractBoodIDFromURL(e.Text)
+		if err != nil {
+			log.Println(err)
+		} else {
+			wg.Add(1)
+			go func(bookID string) {
+				defer wg.Done()
+				s.Client.HSet("fidibo_books", bookID, e.Text)
+				s.Client.SAdd("fidibo_book_ids", bookID)
+			}(bookID)
+		}
+	})
+
+	publisher.OnXML("//urlset/url/loc", func(e *colly.XMLElement) {
 		bookID, err := utils.ExtractBoodIDFromURL(e.Text)
 		if err != nil {
 			log.Println(err)

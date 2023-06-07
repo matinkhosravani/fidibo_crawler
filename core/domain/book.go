@@ -2,6 +2,7 @@ package domain
 
 type Book struct {
 	ID            string   `json:"id"`
+	Source        string   `json:"-"`
 	Title         string   `json:"title"`
 	SubTitle      string   `json:"sub_title"`
 	Slug          string   `json:"slug"`
@@ -10,13 +11,10 @@ type Book struct {
 	Free          string   `json:"free"`
 	Price         string   `json:"price"`
 	Description   string   `json:"description"`
-	PublisherID   string   `json:"publisher_id"`
-	TranslatorID  string   `json:"translator_id"`
-	NarratorID    string   `json:"narrator_id"`
 	Format        string   `json:"format"`
 	Subscriptions bool     `json:"subscriptions"`
 	URL           string   `json:"url"`
 	ImageURL      string   `json:"image_url"`
 	AudioFormat   bool     `json:"audio_format"`
-	Authors       []Author `json:"authors"`
+	Authors       []Author `json:"-"`
 }

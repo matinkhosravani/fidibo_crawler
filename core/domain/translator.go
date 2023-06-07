@@ -1,6 +1,6 @@
 package domain
 
-type Publisher struct {
+type Translator struct {
 	ID   string
 	Name string
 }

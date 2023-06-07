@@ -16,6 +16,12 @@ type cacheRepository struct {
 	client *redis.Client
 }
 
+func (r cacheRepository) GetBookURLS() map[string]string {
+	books := r.client.HGetAll(context.Background(), generateBookURLS())
+
+	return books.Val()
+}
+
 func (r cacheRepository) SetCategories(cs []domain2.Category, expiration time.Duration) error {
 	j, err := json.Marshal(cs)
 	if err != nil {
@@ -31,6 +37,9 @@ func (r cacheRepository) SetCategories(cs []domain2.Category, expiration time.Du
 
 func generateCategoriesKey() string {
 	return "fidibo_categories"
+}
+func generateBookURLS() string {
+	return "fidibo_books"
 }
 
 func (r cacheRepository) GetCategories() []domain2.Category {
@@ -64,7 +73,6 @@ func (r cacheRepository) BooksOfCategoryPageExists(category string, page int) bo
 	}
 
 	return true
-
 }
 
 func NewCacheRepository() (ports.CrawlerCache, error) {
@@ -85,6 +93,7 @@ func NewCacheRepository() (ports.CrawlerCache, error) {
 	return repo, nil
 
 }
+
 func Redis() *redis.Client {
 	return redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",

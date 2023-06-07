@@ -7,7 +7,11 @@ type Crawler struct {
 	Cache ports.CrawlerCache
 }
 
-func NewCrawler() *Crawler {
-	c := &Crawler{}
+func NewCrawler(cache ports.CrawlerCache, repo ports.CrawlerRepository) *Crawler {
+	c := &Crawler{
+		Repo:  repo,
+		Cache: cache,
+	}
+
 	return c
 }

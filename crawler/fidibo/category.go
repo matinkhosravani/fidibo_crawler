@@ -15,21 +15,30 @@ import (
 	"time"
 )
 
+const (
+	DOMAIN = "fidibo.com"
+)
+
 var wg sync.WaitGroup
 var (
 	concurrency = 7
 	semaChan    = make(chan struct{}, concurrency)
 )
 
-func Crawl(c *crawler.Crawler, booksStream chan []domain.Book) {
+func Crawl(c *crawler.Crawler, booksStream chan<- []domain.Book) {
 	categories := findCategories(c)
 	for _, category := range categories {
-		responses := make(chan CategoryResponse)
+		responses := make(chan categoryResponse)
 		totalPages, _ := findTotalPages(c, category)
 		wg.Wait()
 		go func() {
 			for resp := range responses {
-				booksStream <- resp.Books
+				books := resp.Books
+				for _, book := range books {
+					book.Source = "fidibo"
+				}
+
+				booksStream <- books
 			}
 		}()
 		for i := 1; i <= totalPages; i++ {
@@ -49,13 +58,14 @@ func Crawl(c *crawler.Crawler, booksStream chan []domain.Book) {
 func findCategories(c *crawler.Crawler) []domain.Category {
 	categories := c.Cache.GetCategories()
 	if categories != nil {
+		c.Cache.SetCategories(categories, time.Hour*24)
 		return categories
 	}
 	return getAllRootCategories()
 }
 
 func findTotalPages(c *crawler.Crawler, category domain.Category) (int, error) {
-	resChannel := make(chan CategoryResponse)
+	resChannel := make(chan categoryResponse)
 	wg.Add(1)
 	go getBooksByCategory(c, category, 1, resChannel)
 	resp := <-resChannel
@@ -63,7 +73,7 @@ func findTotalPages(c *crawler.Crawler, category domain.Category) (int, error) {
 	return resp.TotalPages, nil
 }
 
-type CategoryResponse struct {
+type categoryResponse struct {
 	Books       []domain.Book `json:"books"`
 	Page        int           `json:"page"`
 	PerPage     int           `json:"size"`
@@ -76,7 +86,7 @@ type CategoryResponse struct {
 
 type option func(url *string)
 
-func getBooksByCategory(c *crawler.Crawler, category domain.Category, page int, responseStream chan<- CategoryResponse, options ...option) {
+func getBooksByCategory(c *crawler.Crawler, category domain.Category, page int, responseStream chan<- categoryResponse, options ...option) {
 	defer func() {
 		<-semaChan // read releases a slot
 	}()
@@ -97,7 +107,7 @@ func getBooksByCategory(c *crawler.Crawler, category domain.Category, page int, 
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
-	var categoryResp CategoryResponse
+	var categoryResp categoryResponse
 	err = json.Unmarshal(body, &categoryResp)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -132,7 +142,7 @@ func getAllRootCategories() []domain.Category {
 	var categories []domain.Category
 
 	c := colly.NewCollector(
-		colly.AllowedDomains("fidibo.com"),
+		colly.AllowedDomains(DOMAIN),
 	)
 	c.WithTransport(&http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -147,7 +157,7 @@ func getAllRootCategories() []domain.Category {
 		}
 	})
 
-	err := c.Visit("https://fidibo.com/")
+	err := c.Visit(fmt.Sprintf("https://%v/", DOMAIN))
 	if err != nil {
 		fmt.Println(err)
 	}

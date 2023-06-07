@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/matinkhosravani/fidibo_crawler/core/domain"
 	"github.com/matinkhosravani/fidibo_crawler/core/ports"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 	"os"
 )
 
@@ -15,6 +17,83 @@ type Repository struct {
 	DB       string
 	MongoURL string
 	Timeout  int
+}
+
+func (m Repository) AddPublishers(bookID string, publishers []domain.Publisher) {
+	_, err := m.Client.Database(m.DB).Collection("books").UpdateOne(context.TODO(), bson.D{
+		{
+			"id", bookID,
+		},
+	}, bson.D{
+		{"$set", bson.D{
+			{"publishers", publishers},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (m Repository) AddTranslators(bookID string, translators []domain.Translator) {
+	_, err := m.Client.Database(m.DB).Collection("books").UpdateOne(context.TODO(), bson.D{
+		{
+			"id", bookID,
+		},
+	}, bson.D{
+		{"$set", bson.D{
+			{"translators", translators},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (m Repository) AddNarrators(bookID string, narrators []domain.Narrator) {
+	_, err := m.Client.Database(m.DB).Collection("books").UpdateOne(context.TODO(), bson.D{
+		{
+			"id", bookID,
+		},
+	}, bson.D{
+		{"$set", bson.D{
+			{"narrators", narrators},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (m Repository) GetByID(ID string) (domain.Book, bool) {
+	var b domain.Book
+
+	err := m.Client.Database(m.DB).Collection("books").FindOne(context.TODO(), bson.D{
+		{
+			"id", ID,
+		},
+	}).Decode(&b)
+	if err == mongo.ErrNoDocuments {
+		return b, false
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return b, true
+}
+func (m Repository) AddAuthors(bookID string, authors []domain.Author) {
+	_, err := m.Client.Database(m.DB).Collection("books").UpdateOne(context.TODO(), bson.D{
+		{
+			"id", bookID,
+		},
+	}, bson.D{
+		{"$set", bson.D{
+			{"authors", authors},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (m Repository) Store(bs []domain.Book) error {

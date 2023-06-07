@@ -13,12 +13,12 @@ import (
 	"os"
 )
 
-var c = crawler.NewCrawler()
-
 func main() {
+
 	app.LoadEnv()
-	c.Repo = chooseRepo()
-	c.Cache = chooseCache()
+	repo := chooseRepo()
+	cache := chooseCache()
+	c := crawler.NewCrawler(cache, repo)
 
 	booksStream := make(chan []domain.Book)
 
